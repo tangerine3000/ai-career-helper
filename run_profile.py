@@ -10,6 +10,7 @@ Usage examples:
 
 import argparse
 import json
+from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -144,9 +145,12 @@ def main():
         "warnings":     profile.warnings,
     }
 
-    with open("output_profile.json", "w") as f:
+    out_dir = Path("outputs")
+    out_dir.mkdir(exist_ok=True)
+    out_path = out_dir / "output_profile.json"
+    with open(out_path, "w") as f:
         json.dump(output, f, indent=2)
-    print(f"\nSaved to output_profile.json")
+    print(f"\nSaved to {out_path}")
 
 
 if __name__ == "__main__":

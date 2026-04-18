@@ -20,7 +20,7 @@ from models.types import CompensationRange, JobDescription, JobListing
 from tools.html_to_text import html_to_text, is_js_rendered
 from tools.http_get import http_get
 
-MAX_CONCURRENT = 5          # fan-out limit (matches Pipeline Orchestrator spec)
+MAX_CONCURRENT = 2          # fan-out limit reduced to avoid API rate limits
 MAX_TEXT_CHARS = 12_000     # truncate before sending to Claude
 
 # ---------------------------------------------------------------------------
@@ -152,6 +152,10 @@ class JobScraperAgent:
         Always returns one JobDescription per listing — failed ones have
         scrape_failed=True and a populated scrape_error.
         """
+        print(
+            f"[JobScraperAgent] Starting scrape for {len(listings)} listings "
+            f"(max_concurrent={MAX_CONCURRENT})."
+        )
         results: list[JobDescription] = []
 
         with ThreadPoolExecutor(max_workers=MAX_CONCURRENT) as pool:
@@ -159,12 +163,26 @@ class JobScraperAgent:
                 pool.submit(self._scrape_one, listing): listing
                 for listing in listings
             }
+            completed = 0
             for future in as_completed(future_to_listing):
-                results.append(future.result())
+                listing = future_to_listing[future]
+                result = future.result()
+                completed += 1
+                status = "ok" if not result.scrape_failed else f"failed ({result.scrape_error})"
+                print(
+                    f"[JobScraperAgent] Completed {completed}/{len(listings)}: "
+                    f"{listing.title} @ {listing.company} -> {status}"
+                )
+                results.append(result)
 
         # Restore original order
         order = {l.id: i for i, l in enumerate(listings)}
         results.sort(key=lambda d: order.get(d.listing_id, 999))
+        success_count = sum(1 for r in results if not r.scrape_failed)
+        print(
+            f"[JobScraperAgent] Done. Successful: {success_count}, "
+            f"Failed: {len(results) - success_count}"
+        )
         return results
 
     # ------------------------------------------------------------------
@@ -173,10 +191,15 @@ class JobScraperAgent:
 
     def _scrape_one(self, listing: JobListing) -> JobDescription:
         """Fetch + extract one listing. Never raises — errors are captured."""
+        print(f"[JobScraperAgent] Fetching: {listing.title} @ {listing.company}")
         # 1. Fetch the page
         fetch_result = http_get(listing.url)
 
         if "error" in fetch_result:
+            print(
+                f"[JobScraperAgent] Fetch failed for {listing.title} @ {listing.company}: "
+                f"{fetch_result['error']}"
+            )
             return _failed(listing, f"Fetch error: {fetch_result['error']}")
 
         raw_html = fetch_result.get("text", "")
@@ -184,6 +207,10 @@ class JobScraperAgent:
 
         # 2. Detect JS-rendered / empty pages
         if is_js_rendered(plain_text):
+            print(
+                f"[JobScraperAgent] JS-rendered/insufficient content: "
+                f"{listing.title} @ {listing.company}"
+            )
             return _failed(
                 listing,
                 "Page appears JS-rendered or returned insufficient text. "
@@ -191,6 +218,7 @@ class JobScraperAgent:
             )
 
         # 3. Extract with Claude
+        print(f"[JobScraperAgent] Extracting structured data: {listing.title} @ {listing.company}")
         return self._extract(listing, plain_text)
 
     # ------------------------------------------------------------------
@@ -200,6 +228,10 @@ class JobScraperAgent:
     def _extract(self, listing: JobListing, plain_text: str) -> JobDescription:
         """Single Claude call: pass text, receive structured JobDescription."""
         truncated = plain_text[:MAX_TEXT_CHARS]
+        print(
+            f"[JobScraperAgent] Sending text to model for {listing.title} @ {listing.company} "
+            f"(chars={len(truncated)})."
+        )
 
         user_message = (
             f"Job listing URL: {listing.url}\n"
@@ -228,13 +260,16 @@ class JobScraperAgent:
                 messages=messages,
             )
         except Exception as exc:
+            print(f"[JobScraperAgent] Claude API error for {listing.title} @ {listing.company}: {exc}")
             return _failed(listing, f"Claude API error: {exc}")
 
         # Extract the submit_job_description call
         for block in response.content:
             if block.type == "tool_use" and block.name == "submit_job_description":
+                print(f"[JobScraperAgent] Extraction complete: {listing.title} @ {listing.company}")
                 return _build_description(listing, block.input, plain_text)
 
+        print(f"[JobScraperAgent] Extraction failed: no submit_job_description for {listing.title} @ {listing.company}")
         return _failed(listing, "Claude did not call submit_job_description.")
 
 

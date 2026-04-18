@@ -2,7 +2,7 @@ import time
 from typing import Any
 
 try:
-    from duckduckgo_search import DDGS
+    from ddgs import DDGS
     _DDGS_AVAILABLE = True
 except ImportError:
     _DDGS_AVAILABLE = False
@@ -21,7 +21,7 @@ def web_search(query: str, max_results: int = 10) -> dict[str, Any]:
     """
     if not _DDGS_AVAILABLE:
         return {
-            "error": "duckduckgo_search is not installed. Run: pip install duckduckgo-search",
+            "error": "ddgs is not installed. Run: pip install ddgs",
             "results": [],
             "count": 0,
         }

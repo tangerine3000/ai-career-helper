@@ -7,7 +7,9 @@ Usage:
 """
 
 import argparse
+import csv
 import json
+from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -44,7 +46,7 @@ def main():
     print(f"Found {len(listings)} listings.\n")
 
     # --- Agent 2: scrape ---
-    print(f"Agent 2 — scraping {len(listings)} listings (up to 5 concurrent)...")
+    print(f"Agent 2 — scraping {len(listings)} listings (up to 2 concurrent)...")
     print("-" * 60)
     descriptions = JobScraperAgent().scrape(listings)
 
@@ -68,6 +70,18 @@ def main():
         print("Failed listings:")
         for jd in bad:
             print(f"  {jd.title} @ {jd.company} — {jd.scrape_error}")
+
+    out_dir = Path("outputs")
+    out_dir.mkdir(exist_ok=True)
+
+    # Export a simple local list of job titles and URLs
+    csv_path = out_dir / "output_job_title_urls.csv"
+    with open(csv_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["title", "url"])
+        for listing in listings:
+            writer.writerow([listing.title, listing.url])
+    print(f"Saved to {csv_path}")
 
     # Write results to JSON
     output = []
@@ -100,9 +114,10 @@ def main():
             })
         output.append(entry)
 
-    with open("output_job_descriptions.json", "w") as f:
+    jd_path = out_dir / "output_job_descriptions.json"
+    with open(jd_path, "w") as f:
         json.dump(output, f, indent=2)
-    print(f"\nSaved to output_job_descriptions.json")
+    print(f"\nSaved to {jd_path}")
 
 
 if __name__ == "__main__":

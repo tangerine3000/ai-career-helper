@@ -12,6 +12,7 @@ Can be driven two ways:
 
 import argparse
 import json
+from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -223,9 +224,12 @@ def main():
         ],
     }
 
-    with open("output_fit_report.json", "w") as f:
+    out_dir = Path("outputs")
+    out_dir.mkdir(exist_ok=True)
+    out_path = out_dir / "output_fit_report.json"
+    with open(out_path, "w") as f:
         json.dump(output, f, indent=2)
-    print(f"\nSaved to output_fit_report.json")
+    print(f"\nSaved to {out_path}")
 
 
 if __name__ == "__main__":

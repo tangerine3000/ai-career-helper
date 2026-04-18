@@ -43,6 +43,12 @@ def write_outputs(output: AdvisorOutput, out_dir: str = "output") -> list[str]:
         f.write(output.resume_improved)
     written.append(resume_path)
 
+    # 1b. Improved resume (plain text)
+    resume_txt_path = os.path.join(out_dir, "resume_improved.txt")
+    with open(resume_txt_path, "w", encoding="utf-8") as f:
+        f.write(output.resume_improved)
+    written.append(resume_txt_path)
+
     # 2. Fit report + gap analysis
     fit_path = os.path.join(out_dir, "fit_report.md")
     with open(fit_path, "w", encoding="utf-8") as f:

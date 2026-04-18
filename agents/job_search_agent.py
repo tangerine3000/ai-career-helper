@@ -164,11 +164,18 @@ class JobSearchAgent:
         """
         Run the agentic search loop and return deduplicated JobListing objects.
         """
+        print(
+            f"[JobSearchAgent] Starting search for '{input.job_title}' "
+            f"(location={input.location or 'any'}, max={input.max_results})"
+        )
         messages: list[dict[str, Any]] = [
             {"role": "user", "content": self._build_prompt(input)}
         ]
+        step = 0
 
         while True:
+            step += 1
+            print(f"[JobSearchAgent] Step {step}: requesting next action from model...")
             response = self.client.messages.create(
                 model=self.model,
                 max_tokens=4096,
@@ -185,12 +192,15 @@ class JobSearchAgent:
 
             # Append assistant turn
             messages.append({"role": "assistant", "content": response.content})
+            print(f"[JobSearchAgent] Step {step}: stop_reason={response.stop_reason}")
 
             if response.stop_reason == "end_turn":
                 # Claude finished without calling submit_results — return empty
+                print("[JobSearchAgent] Model ended turn without submitting results.")
                 return []
 
             if response.stop_reason != "tool_use":
+                print("[JobSearchAgent] Unexpected stop reason; returning no results.")
                 return []
 
             # Process each tool call
@@ -202,9 +212,18 @@ class JobSearchAgent:
                     continue
 
                 if block.name == "submit_results":
+                    submitted = len(block.input.get("listings", []))
+                    print(
+                        f"[JobSearchAgent] Step {step}: submit_results received "
+                        f"with {submitted} raw listings."
+                    )
                     # Done — parse and return
                     final_listings = self._parse_listings(
                         block.input.get("listings", []), input.max_results
+                    )
+                    print(
+                        f"[JobSearchAgent] Step {step}: parsed "
+                        f"{len(final_listings)} deduplicated listings."
                     )
                     tool_results.append(
                         {
@@ -215,10 +234,19 @@ class JobSearchAgent:
                     )
 
                 elif block.name == "web_search":
+                    query = block.input["query"]
+                    print(f"[JobSearchAgent] Step {step}: web_search -> {query}")
                     result = web_search(
-                        block.input["query"],
+                        query,
                         block.input.get("max_results", 10),
                     )
+                    if "error" in result:
+                        print(f"[JobSearchAgent] Step {step}: web_search error: {result['error']}")
+                    else:
+                        print(
+                            f"[JobSearchAgent] Step {step}: web_search returned "
+                            f"{result.get('count', 0)} results."
+                        )
                     tool_results.append(
                         {
                             "type": "tool_result",
@@ -228,7 +256,13 @@ class JobSearchAgent:
                     )
 
                 elif block.name == "fetch_url":
-                    result = http_get(block.input["url"])
+                    url = block.input["url"]
+                    print(f"[JobSearchAgent] Step {step}: fetch_url -> {url}")
+                    result = http_get(url)
+                    if "error" in result:
+                        print(f"[JobSearchAgent] Step {step}: fetch_url error: {result['error']}")
+                    else:
+                        print(f"[JobSearchAgent] Step {step}: fetch_url completed.")
                     tool_results.append(
                         {
                             "type": "tool_result",
@@ -239,6 +273,7 @@ class JobSearchAgent:
 
             # If submit_results was called, we're done
             if final_listings is not None:
+                print(f"[JobSearchAgent] Completed with {len(final_listings)} listings.")
                 return final_listings
 
             # Otherwise continue the loop with tool results

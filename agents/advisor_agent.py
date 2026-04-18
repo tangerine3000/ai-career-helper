@@ -374,13 +374,8 @@ def _build_analysis_context(
     )
 
     return [
-        {
-            "role": "user",
-            "content": [
-                {"type": "text", "text": profile_block, "cache_control": {"type": "ephemeral"}},
-                {"type": "text", "text": fit_block + "\n\n" + jd_block},
-            ],
-        }
+        {"type": "text", "text": profile_block, "cache_control": {"type": "ephemeral"}},
+        {"type": "text", "text": fit_block + "\n\n" + jd_block},
     ]
 
 
@@ -433,13 +428,8 @@ def _build_rewrite_context(
     )
 
     return [
-        {
-            "role": "user",
-            "content": [
-                {"type": "text", "text": original_block, "cache_control": {"type": "ephemeral"}},
-                {"type": "text", "text": instructions_block},
-            ],
-        }
+        {"type": "text", "text": original_block, "cache_control": {"type": "ephemeral"}},
+        {"type": "text", "text": instructions_block},
     ]
 
 
