@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
+import threading
 from pathlib import Path
 from typing import Optional
 
@@ -11,6 +12,9 @@ from pydantic import BaseModel, Field
 
 APP_ROOT = Path(__file__).resolve().parent
 DEFAULT_TIMEOUT_SECONDS = 1800
+SCRIPT_RUN_CONCURRENCY = 1
+SCRIPT_RUN_ACQUIRE_TIMEOUT_SECONDS = 5
+_SCRIPT_RUN_SEMAPHORE = threading.BoundedSemaphore(value=SCRIPT_RUN_CONCURRENCY)
 
 OPENAPI_TAGS = [
     {
@@ -64,7 +68,7 @@ class ProfileRunRequest(BaseModel):
 
 class JobSearchRunRequest(BaseModel):
     title: str = Field(default="AI Engineer", description="Job title to search for")
-    location: Optional[str] = Field(default=None, description="Location, e.g. Remote")
+    location: Optional[str] = Field(default=None, description="Location(s), comma-separated, e.g. Remote,Dublin,London")
     days: int = Field(default=30, ge=1, le=365, description="Posted within N days")
     max_results: int = Field(default=20, ge=1, le=50, alias="max")
 
@@ -73,7 +77,7 @@ class JobSearchRunRequest(BaseModel):
         "json_schema_extra": {
             "example": {
                 "title": "AI Engineer",
-                "location": "Remote",
+                "location": "Remote,Dublin,London",
                 "days": 14,
                 "max": 10,
             }
@@ -83,7 +87,7 @@ class JobSearchRunRequest(BaseModel):
 
 class ScraperRunRequest(BaseModel):
     title: str = Field(default="AI Engineer", description="Job title to search and scrape")
-    location: Optional[str] = Field(default=None, description="Location, e.g. Dublin")
+    location: Optional[str] = Field(default=None, description="Location(s), comma-separated, e.g. Remote,Dublin,London")
     days: int = Field(default=30, ge=1, le=365, description="Posted within N days")
     max_results: int = Field(default=10, ge=1, le=50, alias="max")
 
@@ -92,7 +96,7 @@ class ScraperRunRequest(BaseModel):
         "json_schema_extra": {
             "example": {
                 "title": "AI Engineer",
-                "location": "Remote",
+                "location": "Remote,Dublin,London",
                 "days": 30,
                 "max": 8,
             }
@@ -104,7 +108,7 @@ class FitAnalyzerRunRequest(BaseModel):
     jd: Optional[str] = Field(default=None, description="Path to job descriptions JSON")
     profile: Optional[str] = Field(default=None, description="Path to profile JSON")
     title: Optional[str] = Field(default=None, description="Job title for full pipeline mode")
-    location: Optional[str] = Field(default=None, description="Location for full pipeline mode")
+    location: Optional[str] = Field(default=None, description="Location(s) for full pipeline mode, comma-separated")
     resume: Optional[str] = Field(default=None, description="Resume path for full pipeline mode")
     github: Optional[str] = Field(default=None, description="GitHub username for full pipeline mode")
     linkedin: Optional[str] = Field(default=None, description="LinkedIn URL for full pipeline mode")
@@ -127,7 +131,7 @@ class AdvisorRunRequest(BaseModel):
     profile: Optional[str] = Field(default=None, description="Path to profile JSON")
     fit: Optional[str] = Field(default=None, description="Path to fit report JSON")
     title: Optional[str] = Field(default=None, description="Job title for full pipeline mode")
-    location: Optional[str] = Field(default=None, description="Location for full pipeline mode")
+    location: Optional[str] = Field(default=None, description="Location(s) for full pipeline mode, comma-separated")
     resume: Optional[str] = Field(default=None, description="Resume path for full pipeline mode")
     cv: Optional[str] = Field(default=None, description="Optional separate CV path")
     github: Optional[str] = Field(default=None, description="GitHub username for full pipeline mode")
@@ -150,7 +154,7 @@ class AdvisorRunRequest(BaseModel):
 
 class CareerAdvisorFullPipelineRequest(BaseModel):
     title: str = Field(default="AI Engineer", description="Job title for full pipeline mode")
-    location: Optional[str] = Field(default=None, description="Location for full pipeline mode")
+    location: Optional[str] = Field(default=None, description="Location(s) for full pipeline mode, comma-separated")
     resume: Optional[str] = Field(default=None, description="Resume path for full pipeline mode")
     cv: Optional[str] = Field(default=None, description="Optional separate CV path")
     github: Optional[str] = Field(default=None, description="GitHub username for full pipeline mode")
@@ -163,7 +167,7 @@ class CareerAdvisorFullPipelineRequest(BaseModel):
         "json_schema_extra": {
             "example": {
                 "title": "AI Engineer",
-                "location": "Remote",
+                "location": "Remote,Dublin,London",
                 "resume": "inputs/Resume.pdf",
                 "github": "example-user",
                 "linkedin": "https://www.linkedin.com/in/example",
@@ -179,14 +183,28 @@ def _run_script(script_name: str, args: list[str]) -> ScriptRunResponse:
     if not script_path.exists():
         raise HTTPException(status_code=500, detail=f"Script not found: {script_name}")
 
-    cmd = [sys.executable, str(script_path), *args]
-    completed = subprocess.run(
-        cmd,
-        cwd=APP_ROOT,
-        capture_output=True,
-        text=True,
-        timeout=DEFAULT_TIMEOUT_SECONDS,
-    )
+    acquired = _SCRIPT_RUN_SEMAPHORE.acquire(timeout=SCRIPT_RUN_ACQUIRE_TIMEOUT_SECONDS)
+    if not acquired:
+        raise HTTPException(
+            status_code=429,
+            detail=(
+                "Another pipeline run is already in progress. "
+                "Retry shortly to avoid provider rate limits."
+            ),
+        )
+
+    try:
+        cmd = [sys.executable, str(script_path), *args]
+        completed = subprocess.run(
+            cmd,
+            cwd=APP_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=DEFAULT_TIMEOUT_SECONDS,
+        )
+    finally:
+        _SCRIPT_RUN_SEMAPHORE.release()
+
     return ScriptRunResponse(
         command=cmd,
         exit_code=completed.returncode,

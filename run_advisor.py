@@ -151,7 +151,7 @@ def _render_action_plan(output: AdvisorOutput) -> str:
 # ---------------------------------------------------------------------------
 
 def main():
-    parser = argparse.ArgumentParser(description="CareerMatch — Full Pipeline / Advisor Agent")
+    parser = argparse.ArgumentParser(description="CareerMatch - Full Pipeline / Advisor Agent")
 
     # Mode 1: load from files
     parser.add_argument("--jd",      default=None, help="Path to output_job_descriptions.json")
@@ -182,7 +182,7 @@ def main():
         print(f"  {len(fit_report.per_job)} fit analyses")
 
     elif args.title and (args.resume or args.github or args.linkedin):
-        print("\nRunning full pipeline (Agents 1 → 4)...")
+        print("\nRunning full pipeline (Agents 1 -> 4)...")
 
         from agents.job_search_agent import JobSearchAgent
         from agents.job_scraper_agent import JobScraperAgent
@@ -190,18 +190,18 @@ def main():
         from agents.fit_analyzer_agent import FitAnalyzerAgent
         from models.types import JobSearchInput, ProfileIngestionInput
 
-        print("Agent 1 — searching jobs...")
+        print("Agent 1 - searching jobs...")
         listings = JobSearchAgent().search(
             JobSearchInput(job_title=args.title, location=args.location, max_results=args.max)
         )
         print(f"  {len(listings)} listings found")
 
-        print("Agent 2 — scraping job descriptions...")
+        print("Agent 2 - scraping job descriptions...")
         job_descriptions = JobScraperAgent().scrape(listings)
         ok = sum(1 for jd in job_descriptions if not jd.scrape_failed)
         print(f"  {ok}/{len(job_descriptions)} scraped")
 
-        print("Agent 3 — ingesting profile...")
+        print("Agent 3 - ingesting profile...")
         profile = ProfileIngestionAgent().ingest(ProfileIngestionInput(
             resume_path=args.resume,
             cv_path=args.cv,
@@ -210,7 +210,7 @@ def main():
         ))
         print(f"  Profile built: {len(profile.skills)} skills, {len(profile.experience)} roles")
 
-        print("Agent 4 — analyzing fit...")
+        print("Agent 4 - analyzing fit...")
         fit_report = FitAnalyzerAgent().analyze(job_descriptions, profile)
         print(f"  Readiness: {fit_report.aggregate.overall_readiness}")
 
@@ -224,7 +224,7 @@ def main():
         return
 
     # ── Agent 5 ──────────────────────────────────────────────────────
-    print("\nAgent 5 — building recommendations & rewriting resume...")
+    print("\nAgent 5 - building recommendations & rewriting resume...")
     print("-" * 60)
 
     advisor_output = AdvisorAgent().advise(fit_report, profile, job_descriptions)
@@ -255,7 +255,7 @@ def main():
 
     print(f"\nInterview questions to prepare for:")
     for hint in advisor_output.interview_prep_hints:
-        print(f"  • {hint[:120]}")
+        print(f"  - {hint[:120]}")
 
 
 # ---------------------------------------------------------------------------

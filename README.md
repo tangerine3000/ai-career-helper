@@ -20,7 +20,7 @@ Fastest happy path from a fresh checkout:
 ```bash
 pip install -r requirements.txt
 py run_profile.py --resume "inputs/Resume.pdf" --github your-github-username
-py run_scraper.py --title "AI Engineer" --location "Remote" --max 10
+py run_scraper.py --title "AI Engineer" --location "Remote,Dublin,London" --max 10
 py run_advisor.py --jd outputs/output_job_descriptions.json --profile outputs/output_profile.json --fit outputs/output_fit_report.json --out outputs
 ```
 
@@ -96,8 +96,10 @@ Output:
 ### 2) Job Search (Agent 1 only)
 
 ```bash
-py run_job_search.py --title "AI Engineer" --location "Remote" --days 14 --max 10
+py run_job_search.py --title "AI Engineer" --location "Remote,Dublin,London" --days 14 --max 10
 ```
+
+`--location` supports a single location or a comma-separated list. Example: `"Remote,Dublin,London"`.
 
 Output:
 
@@ -106,7 +108,7 @@ Output:
 ### 3) Search + Scrape (Agents 1 -> 2)
 
 ```bash
-py run_scraper.py --title "AI Engineer" --location "Remote" --days 30 --max 10
+py run_scraper.py --title "AI Engineer" --location "Remote,Dublin,London" --days 30 --max 10
 ```
 
 Outputs:
@@ -160,7 +162,7 @@ Outputs in `--out` directory (default: `output`):
 Recommended sequence:
 
 1. Profile: `py run_profile.py --resume "inputs/Resume.pdf" --github your-github-username`
-2. Search/scrape: `py run_scraper.py --title "AI Engineer" --location "Remote" --max 10`
+2. Search/scrape: `py run_scraper.py --title "AI Engineer" --location "Remote,Dublin,London" --max 10`
 3. Fit: `py run_fit_analyzer.py --jd outputs/output_job_descriptions.json --profile outputs/output_profile.json`
 4. Advisor: `py run_advisor.py --jd outputs/output_job_descriptions.json --profile outputs/output_profile.json --fit outputs/output_fit_report.json --out outputs`
 
@@ -219,7 +221,7 @@ curl -X POST http://127.0.0.1:8000/run/job-search \
   -H "Content-Type: application/json" \
   -d '{
     "title": "AI Engineer",
-    "location": "Remote",
+    "location": "Remote,Dublin,London",
     "days": 14,
     "max": 10
   }'
@@ -232,7 +234,7 @@ curl -X POST http://127.0.0.1:8000/run/job-scraper \
   -H "Content-Type: application/json" \
   -d '{
     "title": "AI Engineer",
-    "location": "Remote",
+    "location": "Remote,Dublin,London",
     "days": 30,
     "max": 8
   }'
@@ -270,7 +272,7 @@ curl -X POST http://127.0.0.1:8000/run/career-advisor/full-pipeline \
   -H "Content-Type: application/json" \
   -d '{
     "title": "AI Engineer",
-    "location": "Remote",
+    "location": "Remote,Dublin,London",
     "resume": "inputs/Resume.pdf",
     "github": "example-user",
     "linkedin": "https://www.linkedin.com/in/example",

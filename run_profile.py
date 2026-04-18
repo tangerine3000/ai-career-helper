@@ -86,7 +86,7 @@ def main():
         print(f"\nGitHub projects ({len(profile.github_projects)}):")
         for proj in profile.github_projects[:5]:
             langs = ", ".join(proj.languages[:3]) or "—"
-            print(f"  {proj.name}  ★{proj.stars}  [{langs}]")
+            print(f"  {proj.name}  [{proj.stars} stars]  [{langs}]")
             if proj.description:
                 print(f"    {proj.description[:100]}")
 

@@ -13,7 +13,7 @@ _HEADERS = {
         "Chrome/124.0 Safari/537.36"
     )
 }
-_MAX_BODY_CHARS = 8_000   # keep payloads to Claude manageable
+_MAX_BODY_CHARS = 500_000  # increased to handle large GitHub API responses (~100KB)
 
 
 def http_get(url: str, timeout: int = 15, extra_headers: dict[str, str] | None = None) -> dict[str, Any]:
